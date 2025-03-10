@@ -10,7 +10,7 @@ npm install @node-in-layers/aws
 
 ## Config
 
-The config app provides a globals file, that will take your configuration object, see if there are parameter store and secrets manager objects in it. If there are, it will rearch out to each of those services to find and the replace them within the config.
+The config app provides the ability to have configurations inside a config file that use values from Parameter store and Secrets manager. In order to do this, the config app provides a globals file, that will take your configuration object, see if there are parameter store and secrets manager objects in it. If there are, it will reach out to each of those services to find and the replace them within the config.
 
 ### How To Use
 
