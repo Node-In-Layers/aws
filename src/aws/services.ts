@@ -18,7 +18,7 @@ import {
 
 const _awsServiceToBuilder: Record<AwsService, (awsConfig: any) => any> = {
   [AwsService.s3]: awsConfig => ({
-    ecs: {
+    s3: {
       s3Client: new s3.S3Client(awsConfig),
       ...ssm,
     },
