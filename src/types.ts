@@ -26,12 +26,20 @@ enum AwsNamespace {
 }
 
 enum AwsService {
-  s3='s3',
-  ssm='ssm',
-  secretsManager='secretsManager',
-  dynamoDb='dynamoDb',
-  ecs='ecs',
+  s3 = 's3',
+  ssm = 'ssm',
+  secretsManager = 'secretsManager',
+  dynamoDb = 'dynamoDb',
+  ecs = 'ecs',
 }
+
+type AwsServices = Readonly<{
+  aws3: Partial<Aws3>
+}>
+
+type AwsServicesContext = Readonly<{
+  [AwsNamespace.root]: AwsServices
+}>
 
 type Aws3Config = Config &
   Partial<
@@ -43,4 +51,11 @@ type Aws3Config = Config &
     }>
   >
 
-export { AwsNamespace, Aws3Config, Aws3, AwsService }
+export {
+  AwsNamespace,
+  Aws3Config,
+  Aws3,
+  AwsService,
+  AwsServices,
+  AwsServicesContext,
+}

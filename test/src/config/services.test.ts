@@ -72,7 +72,7 @@ const createMocks = () => {
       '@node-in-layers/aws': {
         aws3,
       },
-    }
+    },
   }
 }
 

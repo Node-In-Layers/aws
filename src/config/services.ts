@@ -8,7 +8,8 @@ import { AwsConfigServices } from './types.js'
 const create = (context: ServicesContext): AwsConfigServices => {
   const readSecretsInSecretsManager = async (keys: string[]) => {
     const secretsManager =
-      context.services[AwsNamespace.root].aws3.secretsManager.secretsManagerClient
+      context.services[AwsNamespace.root].aws3.secretsManager
+        .secretsManagerClient
     const mapped = await asyncMap(
       keys,
       async secretId => {

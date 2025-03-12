@@ -8,7 +8,13 @@ import * as libDynamo from '@aws-sdk/lib-dynamodb'
 import * as ssm from '@aws-sdk/client-ssm'
 import * as secretsManager from '@aws-sdk/client-secrets-manager'
 import { memoizeValueSync } from '@node-in-layers/core/utils.js'
-import { Aws3, Aws3Config, AwsNamespace, AwsService } from '../types.js'
+import {
+  Aws3,
+  Aws3Config,
+  AwsNamespace,
+  AwsService,
+  AwsServices,
+} from '../types.js'
 
 const _awsServiceToBuilder: Record<AwsService, (awsConfig: any) => any> = {
   [AwsService.s3]: awsConfig => ({
@@ -68,7 +74,7 @@ const createAws3Client = memoizeValueSync((config: Aws3Config): Aws3 => {
   return aws3 as Aws3
 })
 
-const create = ({ config }) => {
+const create = ({ config }): AwsServices => {
   const aws3 = createAws3Client(config)
   return {
     aws3,
