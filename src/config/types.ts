@@ -1,17 +1,20 @@
-type AwsConfigServices = Readonly<object>
+import { AwsNamespace } from '../types.js'
+
+type AwsConfigServices = Readonly<{
+  readSecretsInSecretsManager: (
+    keys: string[]
+  ) => Promise<Record<string, string>>
+  readParameters: (keys: string[]) => Promise<Record<string, string>>
+}>
 
 type AwsConfigServicesLayer = Readonly<{
-  'aws-config/aws-config': AwsConfigServices
+  [AwsNamespace.config]: AwsConfigServices
 }>
 
 type AwsConfigFeatures = Readonly<object>
 
 type AwsConfigFeaturesLayer = Readonly<{
-  'aws-config/aws-config': AwsConfigFeatures
-}>
-
-type AwsConfigNamespace = Readonly<{
-  root: '@node-in-layers/aws-config'
+  [AwsNamespace.config]: AwsConfigFeatures
 }>
 
 /**
@@ -57,7 +60,6 @@ export {
   AwsConfigServicesLayer,
   AwsConfigFeatures,
   AwsConfigFeaturesLayer,
-  AwsConfigNamespace,
   AwsEntriesToReplace,
   AwsEntryKey,
   AwsEntryType,

@@ -41,7 +41,7 @@ export type AwsServices = Readonly<{
   aws3: Partial<Aws3>
 }>
 
-export type AwsServicesContext = Readonly<{
+export type AwsServicesLayer = Readonly<{
   [AwsNamespace.root]: AwsServices
 }>
 
