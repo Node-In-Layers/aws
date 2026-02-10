@@ -3,6 +3,7 @@ import merge from 'lodash/merge.js'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import * as ecs from '@aws-sdk/client-ecs'
 import * as s3 from '@aws-sdk/client-s3'
+import * as sqs from '@aws-sdk/client-sqs'
 import * as dynamo from '@aws-sdk/client-dynamodb'
 import * as libDynamo from '@aws-sdk/lib-dynamodb'
 import * as ssm from '@aws-sdk/client-ssm'
@@ -48,6 +49,12 @@ const _awsServiceToBuilder: Record<AwsService, (awsConfig: any) => any> = {
       ...secretsManager,
     },
   }),
+  [AwsService.sqs]: awsConfig => ({
+    sqs: {
+      sqsClient: new sqs.SQSClient(awsConfig),
+      ...sqs,
+    },
+  }),
 }
 
 const createAws3Client = memoizeValueSync((config: Aws3Config): Aws3 => {
@@ -61,6 +68,7 @@ const createAws3Client = memoizeValueSync((config: Aws3Config): Aws3 => {
     httpOptions: {
       agent: sslAgent,
     },
+    ...config[AwsNamespace.root]?.awsClientProps,
   }
 
   const services =
