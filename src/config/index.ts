@@ -1,4 +1,6 @@
-export * as globals from './globals.js'
+import { AwsNamespace } from '../types.js'
 
-const name = '@node-in-layers/aws-config'
-export { name }
+export * as services from './services.js'
+export * from './types.js'
+
+export const name = AwsNamespace.config

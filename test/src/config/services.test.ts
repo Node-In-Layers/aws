@@ -1,142 +1,220 @@
-import chai, { assert } from 'chai'
-import chaiAsPromised from 'chai-as-promised'
-import sinon from 'sinon'
-import sinonChai from 'sinon-chai'
-import { create } from '../../../src/config/services'
+import { assert } from 'chai'
+import * as sinon from 'sinon'
+import { GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+import { GetParameterCommand } from '@aws-sdk/client-ssm'
+import type { ServicesContext } from '@node-in-layers/core'
+import {
+  create,
+  createAwsConfigSecretsService,
+} from '../../../src/config/services.js'
+import type { Aws3Config } from '../../../src/types.js'
+import {
+  AwsNamespace,
+  AwsSecretHydrationService,
+  AwsService,
+} from '../../../src/types.js'
+import type { AwsServicesLayer } from '../../../src/types.js'
 
-chai.use(sinonChai)
-chai.use(chaiAsPromised)
+const baseAwsConfig = {
+  [AwsNamespace.root]: {
+    awsClientProps: { region: 'us-east-1' },
+  },
+} as unknown as Aws3Config
 
-const createMockAWS = (
-  { onAWSConfigUpdate = () => {} } = { onAWSConfigUpdate: () => {} }
-) => {
-  const sendMock = sinon.stub().resolves({})
-
-  const mockDocumentDbClientFrom = sinon.stub().returns({
-    send: sendMock,
-  })
-
-  const _command = (commandKey: string) => {
-    return sinon.stub().returns({ Mock: commandKey })
-  }
-
-  return {
-    sendMock,
-    mockDocumentDbClientFrom,
-    ssm: {
-      ssmClient: {
-        send: sendMock,
-      },
-      GetParameterCommand: _command('GetParameterCommand'),
-    },
-    secretsManager: {
-      secretsManagerClient: {
-        send: sendMock,
-      },
-      GetSecretValueCommand: _command('GetSecretValueCommand'),
-    },
-    sqs: {
-      sqsClient: {
-        send: sendMock,
-      },
-      SendMessageCommand: _command('SendMessageCommand'),
-    },
-    dynamo: {
-      dynamoDbClient: {
-        send: sendMock,
-      },
-      DynamoDBDocumentClient: {
-        from: mockDocumentDbClientFrom,
-      },
-      PutCommand: _command('PutCommand'),
-      GetCommand: _command('GetCommand'),
-      DeleteCommand: _command('DeleteCommand'),
-      ScanCommand: _command('ScanCommand'),
-      BatchWriteCommand: _command('BatchWriteCommand'),
-    },
-    ecs: {
-      ecsClient: {
-        send: sendMock,
-      },
-      RunTaskCommand: _command('RunTaskCommand'),
-      DescribeTasksCommand: _command('DescribeTasksCommand'),
-    },
-  }
-}
-
-const createMocks = () => {
-  const aws3 = createMockAWS()
-  return {
-    aws3,
+const asServicesContext = (
+  aws3: AwsServicesLayer[typeof AwsNamespace.root]['aws3']
+): ServicesContext<Aws3Config, AwsServicesLayer> =>
+  ({
+    config: baseAwsConfig,
+    models: {},
     services: {
-      '@node-in-layers/aws': {
-        aws3,
-      },
+      [AwsNamespace.root]: { aws3 },
     },
-  }
-}
+  }) as ServicesContext<Aws3Config, AwsServicesLayer>
+
+const makeAws3 = (opts: {
+  secretsSend: sinon.SinonStub
+  ssmSend: sinon.SinonStub
+}) => ({
+  secretsManager: {
+    secretsManagerClient: { send: opts.secretsSend },
+    GetSecretValueCommand,
+  },
+  ssm: {
+    ssmClient: { send: opts.ssmSend },
+    GetParameterCommand,
+  },
+})
 
 describe('/src/config/services.ts', () => {
-  describe('#readParameters()', () => {
-    it('should pass the correct parameters to ParameterStore', async () => {
-      const mocks = createMocks()
-      const input = {
-        location: 'parameterStore',
-        currentWorkingDirectory: '/path/not-real',
-        environment: 'unit-test',
-        serviceName: 'pete-standard-service',
-        ...mocks,
-      }
-      mocks.aws3.sendMock
-        .onFirstCall()
-        .resolves({
-          Parameter: {
-            Value: 'string-1',
-          },
-        })
-        .onSecondCall()
-        .resolves({
-          Parameter: {
-            Value: 'string-2',
-          },
-        })
-      const instance = create(input)
-      await instance.readParameters(['key-1', 'key-2'])
-      const actual = [
-        mocks.aws3.ssm.GetParameterCommand.getCall(0).args[0],
-        mocks.aws3.ssm.GetParameterCommand.getCall(1).args[0],
-      ]
-      const expected = [{ Name: 'key-1' }, { Name: 'key-2' }]
-      assert.deepEqual(actual, expected)
+  afterEach(() => {
+    sinon.restore()
+  })
+
+  describe('#create()', () => {
+    it('should return createSecretsService that resolves secrets like createAwsConfigSecretsService', async () => {
+      const secretsSend = sinon.stub().resolves({ SecretString: 'layer' })
+      const ssmSend = sinon.stub().resolves({ Parameter: { Value: 'unused' } })
+      const aws3 = makeAws3({ secretsSend, ssmSend })
+
+      const services = create(asServicesContext(aws3))
+      const backend = services.createSecretsService()
+      const actual = await backend.getStoredSecret({
+        awsService: AwsSecretHydrationService.SecretsManager,
+        key: '/from-layer',
+      })
+
+      assert.equal(actual, 'layer')
+      assert.equal(secretsSend.callCount, 1)
     })
   })
-  describe('#readSecretsInSecretsManager()', () => {
-    it('should pass the correct parameters to SecretsManager', async () => {
-      const mocks = createMocks()
-      const input = {
-        location: 'parameterStore',
-        currentWorkingDirectory: '/path/not-real',
-        environment: 'unit-test',
-        serviceName: 'pete-standard-service',
-        ...mocks,
+
+  describe('#createAwsConfigSecretsService()', () => {
+    it('should use Secrets Manager when awsService is explicitly SecretsManager', async () => {
+      const secretsSend = sinon.stub().resolves({ SecretString: 'explicit-sm' })
+      const ssmSend = sinon.stub().resolves({ Parameter: { Value: 'unused' } })
+      const backend = createAwsConfigSecretsService(
+        asServicesContext(makeAws3({ secretsSend, ssmSend }))
+      )
+
+      const actual = await backend.getStoredSecret({
+        awsService: AwsSecretHydrationService.SecretsManager,
+        key: '/explicit',
+      })
+
+      assert.equal(actual, 'explicit-sm')
+      assert.equal(secretsSend.callCount, 1)
+    })
+
+    it('should merge default SM and SSM with extra services from config', async () => {
+      const configWithExtra: Aws3Config = {
+        ...baseAwsConfig,
+        [AwsNamespace.root]: {
+          ...baseAwsConfig[AwsNamespace.root],
+          services: [AwsService.s3],
+        },
       }
-      mocks.aws3.sendMock
-        .onFirstCall()
-        .resolves({
-          SecretString: 'string-1',
+      const secretsSend = sinon.stub().resolves({ SecretString: 'merged' })
+      const ssmSend = sinon.stub().resolves({ Parameter: { Value: 'unused' } })
+      const aws3 = makeAws3({ secretsSend, ssmSend })
+
+      const ctx = {
+        config: configWithExtra,
+        models: {},
+        services: {
+          [AwsNamespace.root]: { aws3 },
+        },
+      } as ServicesContext<Aws3Config, AwsServicesLayer>
+
+      const backend = createAwsConfigSecretsService(ctx)
+      const actual = await backend.getStoredSecret({ key: '/merged' })
+
+      assert.equal(actual, 'merged')
+    })
+
+    it('should throw when Secrets Manager returns no SecretString', async () => {
+      const secretsSend = sinon.stub().resolves({})
+      const ssmSend = sinon.stub().resolves({ Parameter: { Value: 'unused' } })
+      const backend = createAwsConfigSecretsService(
+        asServicesContext(makeAws3({ secretsSend, ssmSend }))
+      )
+
+      let thrown: unknown
+      try {
+        await backend.getStoredSecret({ key: '/empty' })
+      } catch (e) {
+        thrown = e
+      }
+      assert.match(
+        String((thrown as Error)?.message ?? thrown),
+        /no SecretString/
+      )
+    })
+
+    it('should throw when SSM GetParameter returns no Parameter value', async () => {
+      const secretsSend = sinon.stub().resolves({ SecretString: 'x' })
+      const ssmSend = sinon.stub().resolves({ Parameter: {} })
+      const backend = createAwsConfigSecretsService(
+        asServicesContext(makeAws3({ secretsSend, ssmSend }))
+      )
+
+      let thrown: unknown
+      try {
+        await backend.getStoredSecret({
+          key: '/no-value',
+          awsService: AwsSecretHydrationService.ParameterStore,
         })
-        .onSecondCall()
-        .resolves({
-          SecretString: 'string-2',
-        })
-      const instance = create(input)
-      await instance.readSecretsInSecretsManager(['key-1', 'key-2'])
-      const actual = [
-        mocks.aws3.secretsManager.GetSecretValueCommand.getCall(0).args[0],
-        mocks.aws3.secretsManager.GetSecretValueCommand.getCall(1).args[0],
-      ]
-      const expected = [{ SecretId: 'key-1' }, { SecretId: 'key-2' }]
-      assert.deepEqual(actual, expected)
+      } catch (e) {
+        thrown = e
+      }
+      assert.match(String((thrown as Error)?.message ?? thrown), /no value/)
+    })
+
+    it('should throw when storeSecret is called', async () => {
+      const secretsSend = sinon.stub().resolves({ SecretString: 'x' })
+      const ssmSend = sinon.stub().resolves({ Parameter: { Value: 'unused' } })
+      const backend = createAwsConfigSecretsService(
+        asServicesContext(makeAws3({ secretsSend, ssmSend }))
+      )
+
+      let thrown: unknown
+      try {
+        await backend.storeSecret({ key: 'k', value: 'v' })
+      } catch (e) {
+        thrown = e
+      }
+      assert.match(
+        String((thrown as Error)?.message ?? thrown),
+        /storeSecret is not implemented/
+      )
+    })
+
+    it('should throw when secretsManager client is missing from aws3', () => {
+      const secretsSend = sinon.stub()
+      const ssmSend = sinon.stub().resolves({ Parameter: {} })
+      const aws3 = {
+        secretsManager: undefined,
+        ssm: {
+          ssmClient: { send: ssmSend },
+          GetParameterCommand,
+        },
+      } as AwsServicesLayer[typeof AwsNamespace.root]['aws3']
+
+      let thrown: unknown
+      try {
+        createAwsConfigSecretsService(asServicesContext(aws3))
+      } catch (e) {
+        thrown = e
+      }
+      assert.match(
+        String((thrown as Error)?.message ?? thrown),
+        /secretsManager client is not available/
+      )
+      assert.equal(secretsSend.callCount, 0)
+    })
+
+    it('should throw when ssm client is missing from aws3', () => {
+      const secretsSend = sinon.stub().resolves({ SecretString: 'x' })
+      const ssmSend = sinon.stub()
+      const aws3 = {
+        secretsManager: {
+          secretsManagerClient: { send: secretsSend },
+          GetSecretValueCommand,
+        },
+        ssm: undefined,
+      } as AwsServicesLayer[typeof AwsNamespace.root]['aws3']
+
+      let thrown: unknown
+      try {
+        createAwsConfigSecretsService(asServicesContext(aws3))
+      } catch (e) {
+        thrown = e
+      }
+      assert.match(
+        String((thrown as Error)?.message ?? thrown),
+        /ssm client is not available/
+      )
+      assert.equal(ssmSend.callCount, 0)
     })
   })
 })

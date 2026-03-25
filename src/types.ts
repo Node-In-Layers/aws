@@ -37,6 +37,22 @@ export enum AwsService {
   sqs = 'sqs',
 }
 
+/**
+ * Which AWS API backs a `nil-secret` placeholder when using `secretsService` from this package
+ * with `@node-in-layers/secrets` (`awsService` on the placeholder).
+ */
+export enum AwsSecretHydrationService {
+  SecretsManager = 'secretsManager',
+  ParameterStore = 'parameterStore',
+}
+
+/** Props passed through from nil-secret hydration (minus `type` / `format`). */
+export type AwsGetStoredSecretProps = Readonly<{
+  key: string
+  /** When omitted, Secrets Manager is used. */
+  awsService?: AwsSecretHydrationService
+}>
+
 export type AwsServices = Readonly<{
   aws3: Partial<Aws3>
 }>

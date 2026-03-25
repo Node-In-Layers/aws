@@ -1,68 +1,51 @@
-import { AwsNamespace } from '../types.js'
+import type { ServicesContext } from '@node-in-layers/core'
 
-type AwsConfigServices = Readonly<{
-  readSecretsInSecretsManager: (
-    keys: string[]
-  ) => Promise<Record<string, string>>
-  readParameters: (keys: string[]) => Promise<Record<string, string>>
+import type {
+  Aws3Config,
+  AwsGetStoredSecretProps,
+  AwsNamespace,
+  AwsServicesLayer,
+} from '../types.js'
+
+/**
+ * Backend returned for `@node-in-layers/secrets` nil-secret hydration (AWS Secrets Manager / SSM).
+ * Matches the string surface of `SecretsService` from `@node-in-layers/secrets` for `getStoredSecret` props
+ * (including optional `awsService`).
+ */
+export type AwsConfigSecretsService = Readonly<{
+  getStoredSecret: (props: AwsGetStoredSecretProps) => Promise<string>
+  storeSecret: (props: AwsConfigStoreSecretProps) => Promise<void>
 }>
 
-type AwsConfigServicesLayer = Readonly<{
+export type AwsConfigStoreSecretProps = Readonly<{
+  key: string
+  value: string
+}>
+
+/**
+ * AWS config domain services: nil-secret hydration and related helpers.
+ * @interface
+ */
+export type AwsConfigServices = Readonly<{
+  /**
+   * Builds a secrets backend for config hydration (`secretServiceFactory` uses this shape).
+   */
+  createSecretsService: () => AwsConfigSecretsService
+}>
+
+/**
+ * Layer shape: `context.services[AwsNamespace.config]`.
+ * @interface
+ */
+export type AwsConfigServicesLayer = Readonly<{
   [AwsNamespace.config]: AwsConfigServices
 }>
 
-type AwsConfigFeatures = Readonly<object>
-
-type AwsConfigFeaturesLayer = Readonly<{
-  [AwsNamespace.config]: AwsConfigFeatures
-}>
-
 /**
- * The key that defines an aws entry
+ * Context for the AWS config services factory (loads after root AWS services).
+ * @interface
  */
-const AwsEntryKey = 'type'
-
-/**
- * The type of supported aws entries in a config.
- */
-enum AwsEntryType {
-  secretsManager = 'secretsManager',
-  parameterStore = 'parameterStore',
-}
-
-/**
- * An AWS entry that has not been replaced yet.
- */
-type PartialAwsEntry<T extends AwsEntryType> = Readonly<{
-  type: T
-  key: string
-}>
-
-/**
- * An object that holds multiple Aws entries to replace.
- */
-type AwsEntriesToReplace<T extends AwsEntryType> = Readonly<
-  Record<string, PartialAwsEntry<T>>
+export type AwsConfigServicesContext = ServicesContext<
+  Aws3Config,
+  AwsServicesLayer
 >
-
-/**
- * All the secrets manager entries to replace
- */
-type SecretsToReplace = AwsEntriesToReplace<AwsEntryType.secretsManager>
-
-/**
- * All the parameter store entries to replace
- */
-type ParameterStoreToReplace = AwsEntriesToReplace<AwsEntryType.parameterStore>
-
-export {
-  AwsConfigServices,
-  AwsConfigServicesLayer,
-  AwsConfigFeatures,
-  AwsConfigFeaturesLayer,
-  AwsEntriesToReplace,
-  AwsEntryKey,
-  AwsEntryType,
-  ParameterStoreToReplace,
-  SecretsToReplace,
-}

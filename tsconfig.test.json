@@ -1,21 +1,10 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "target": "es5",
-    "lib": ["es2021", "dom", "es2015"],
-    "module": "next",
     "noEmit": true,
-    "moduleResolution": "nodenext",
-    "rootDir": "./src",
-    "allowJs": true,
-    "declaration": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "noImplicitAny": false,
-    "skipLibCheck": true
+    "rootDir": ".",
+    "types": ["mocha", "node"]
   },
-  "include": ["./src"],
+  "include": ["./src/**/*.ts", "./test/**/*.ts"],
   "exclude": ["node_modules", "dist", "features", "container"]
 }

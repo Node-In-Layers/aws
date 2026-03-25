@@ -27,7 +27,7 @@ const _awsServiceToBuilder: Record<AwsService, (awsConfig: any) => any> = {
   [AwsService.ecs]: awsConfig => ({
     ecs: {
       ecsClient: new ecs.ECSClient(awsConfig),
-      ...ssm,
+      ...ecs,
     },
   }),
   [AwsService.ssm]: awsConfig => ({

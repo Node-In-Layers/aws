@@ -2,6 +2,8 @@
 export * from './types.js'
 export * from './config/types.js'
 
+export { secretsService } from './secretsService.js'
+
 // Export default domain
 export * from './aws/index.js'
 
