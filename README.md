@@ -36,64 +36,63 @@ const awsConfig = {
 
 ## Config
 
-The config app provides the ability to have configurations inside a config file that use values from Parameter store and Secrets manager. In order to do this, the config app provides a globals file, that will take your configuration object, see if there are parameter store and secrets manager objects in it. If there are, it will reach out to each of those services to find and the replace them within the config.
+Provides a Secret Service for the `@node-in-layers/secrets` package.
+This creates the ability for configurations to have paths for parameter store and secrets manager, that are then populated at runtime.
 
 ### How To Use
 
-Within the apps of your system's configuration:
+### Setup With `@node-in-layers/secrets`
 
-```javascript
-import { CoreNamespace } from '@node-in-layers/core/index.js'
+This package can be used as the `secretServiceFactory` for `@node-in-layers/secrets`.
 
-const core = {
-  apps: await Promise.all([
-    // Adds support for aws config files.
-    import('@node-in-layers/aws/config/index.js'),
-  ]),
-  layerOrder: ['services', 'features', 'express'],
-  logLevel: 'debug',
-  logFormat: 'full',
-}
+Example system config:
 
-export default () => ({
+```typescript
+import { CoreNamespace } from '@node-in-layers/core'
+import {
+  config as secretsConfig,
+  SecretsNamespace,
+} from '@node-in-layers/secrets'
+import { secretsService, AwsNamespace, AwsService } from '@node-in-layers/aws'
+
+export default async () => ({
   systemName: 'my-example-system',
   environment: 'dev',
-  [CoreNamespace.root]: core,
+
+  // Used by the AWS secrets adapter to create AWS SDK clients
+  [AwsNamespace.root]: {
+    awsClientProps: { region: 'us-east-1' },
+    services: [AwsService.secretsManager, AwsService.ssm],
+  },
+
+  [CoreNamespace.root]: {
+    apps: [
+      secretsConfig,
+      // your domains...
+    ],
+    layerOrder: ['services', 'features', 'express'],
+  },
+
+  [SecretsNamespace.Core]: {
+    secretServiceFactory: secretsService,
+  },
+
+  // Example configurations, to be replaced
+  myApp: {
+    myClient: {
+      key: {
+        type: 'nil-secret',
+        //awsService: "secretsManager", // don't need to put this, but can be helpful for making explicit.
+        format: 'string',
+        key: '/path/with-in/secrets-manager',
+      },
+    },
+    aDynamicAwsPath: {
+      type: 'nil-secret',
+      awsService: 'parameterStore',
+      format: 'string',
+      key: '/path/with-in/parameter-store',
+    },
+  },
 })
 ```
-
-### Example Config
-
-```json
-{
-  "myApp": {
-    "myClient": {
-      "url": "https://some-url",
-      "key": {
-        "type": "secretsManager",
-        "key": "/path/with-in/secrets-manager"
-      }
-    },
-    "aDynamicAwsPath": {
-      "type": "parameterStore",
-      "key": "/path/with-in/parameter-store"
-    }
-  }
-}
-```
-
-Gets turned into...
-
-```json
-{
-  "myApp": {
-    "myClient": {
-      "url": "https://some-url",
-      "key": "the-value-from-secrets-manager"
-    },
-    "aDynamicAwsPath": "the-value-from-parameter-store"
-  }
-}
-```
-
-search parameter store and secrets
